@@ -11,4 +11,10 @@ terraform {
 provider "aws" {
   region  = var.aws_region
   profile = var.aws_profile
+  default_tags {
+    tags = {
+      Environment = "test"
+      Course      = "Udemy-Maarek-SAA-C03"
+    }
+  }
 }
