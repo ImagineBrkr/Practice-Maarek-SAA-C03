@@ -25,7 +25,7 @@ output "iam_user_stephan_password" {
 }
 
 
-## GROUP CREATION
+## USER GROUP CREATION
 
 
 # Create an IAM Group
@@ -172,4 +172,57 @@ resource "aws_iam_user" "iam_user_mary" {
   force_destroy        = true
   permissions_boundary = aws_iam_policy.iam_policy_boundary_for_user.arn
   # Even though the policy says Allow, it doesn't give any permissions
+}
+
+
+## PASSWORD POLICY
+
+
+# Password policy for all the users on the account
+# https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_account-policy.html
+resource "aws_iam_account_password_policy" "strict" {
+  minimum_password_length      = 8
+  require_lowercase_characters = true
+  require_numbers              = true
+  require_uppercase_characters = true
+  require_symbols              = true
+
+  allow_users_to_change_password = true
+  password_reuse_prevention      = true
+  max_password_age               = 30
+  hard_expiry                    = false
+}
+
+
+## IAM ROLES
+
+
+resource "aws_iam_role" "iam_role_ec2" {
+  name = "ec2_role"
+  path = "/"
+  # It can also have permissions boundary
+  # permissions_boundary = aws_iam_policy.iam_policy_boundary_for_user.arn
+
+  # The assume role policy specifies which service will use this role
+  # It can also specify other accounts
+  assume_role_policy = <<EOT
+"Version": "2012-10-17",
+"Statement": [
+    {
+      "Action": "sts:AssumeRole"
+      "Effect": "Allow"
+      "Sid": "1"
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      }
+    }
+  ]
+}
+EOT
+}
+
+# Now we give permissions to the role
+resource "aws_iam_role_policy_attachment" "iam_role_policy_attach_development" {
+  role       = aws_iam_role.iam_role_ec2.name
+  policy_arn = aws_iam_policy.iam_policy_development.arn
 }
