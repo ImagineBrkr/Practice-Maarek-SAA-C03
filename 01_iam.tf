@@ -188,7 +188,7 @@ resource "aws_iam_account_password_policy" "strict" {
   require_symbols              = true
 
   allow_users_to_change_password = true
-  password_reuse_prevention      = true
+  password_reuse_prevention      = 1
   max_password_age               = 30
   hard_expiry                    = false
 }
@@ -206,12 +206,13 @@ resource "aws_iam_role" "iam_role_ec2" {
   # The assume role policy specifies which service will use this role
   # It can also specify other accounts
   assume_role_policy = <<EOT
+{
 "Version": "2012-10-17",
 "Statement": [
     {
-      "Action": "sts:AssumeRole"
-      "Effect": "Allow"
-      "Sid": "1"
+      "Action": "sts:AssumeRole",
+      "Effect": "Allow",
+      "Sid": "1",
       "Principal": {
         "Service": "ec2.amazonaws.com"
       }
