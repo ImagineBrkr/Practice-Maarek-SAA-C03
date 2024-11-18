@@ -59,7 +59,7 @@ resource "aws_vpc_security_group_ingress_rule" "vpc_sg_r_allow_ssh" {
 
 
 resource "aws_iam_instance_profile" "iam_instance_profile_web_server" {
-  name = "Web Server Profile"
+  name = "Web-Server-Profile"
   # We created the role on the iam Section
   role = aws_iam_role.iam_role_ec2.name
 }
@@ -103,4 +103,102 @@ EOT
   # With this instance profile, the vm can assume the role and all its permissions
   iam_instance_profile = aws_iam_instance_profile.iam_instance_profile_web_server.name
 
+  # Check Placement groups below
+  placement_group = aws_placement_group.ec2_placement_group_web_server.id
+  # placement_partition_number = "1"
+}
+
+
+# LAUNCH TEMPLATE
+
+resource "aws_launch_template" "ec2_launch_template_web_server" {
+  name = "Web-Server-Template"
+
+  block_device_mappings {
+    device_name = "/dev/sdf"
+
+    ebs {
+      volume_size = 8
+    }
+  }
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.iam_instance_profile_web_server.name
+  }
+
+  ebs_optimized                        = true
+  image_id                             = "ami-0664c8f94c2a2261b"
+  instance_initiated_shutdown_behavior = "stop"
+  instance_type                        = "t2.micro"
+  key_name                             = aws_key_pair.ec2_key_pair_web_server.key_name
+  vpc_security_group_ids               = [aws_security_group.vpc_sg_allow_ssh.id]
+
+  network_interfaces {
+    associate_public_ip_address = true
+  }
+
+  placement {
+    availability_zone = "us-west-2a"
+  }
+
+  user_data = <<EOT
+#!/bin/bash
+# This script will run on first start with sudo permissions
+apt update
+apt install -y httpd
+systemctl start httpd
+systemctl enable httpd
+EOT
+}
+
+
+# LAUNCH TYPES
+
+
+# SPOT INSTANCES
+
+
+resource "aws_spot_instance_request" "cheap_worker" {
+  ami           = "ami-0664c8f94c2a2261b"
+  spot_price    = "0.03" # Max price
+  instance_type = "t2.micro"
+  spot_type     = "persistent"
+  valid_from    = "2024-12-01T00:00:00-05:00"
+  valid_until   = "2024-12-31T00:00:00-05:00"
+}
+
+
+# Capacity Reservation
+
+
+resource "aws_ec2_capacity_reservation" "default" {
+  instance_type     = "t2.micro"
+  instance_platform = "Linux/UNIX"
+  availability_zone = "us-east-1"
+  instance_count    = 1
+}
+
+
+# ELASTIC IP
+
+
+resource "aws_eip" "ec2_eip_web_server" {
+  domain = "vpc"
+}
+
+resource "aws_eip_association" "ec2_eip_web_server_association" {
+  instance_id        = aws_instance.ec2_instance_web_server.id
+  allocation_id      = aws_eip.ec2_eip_web_server.id
+  private_ip_address = aws_instance.ec2_instance_web_server.private_ip
+}
+
+
+# Placement Groups
+
+
+resource "aws_placement_group" "ec2_placement_group_web_server" {
+  name         = "Web-Server-PG"
+  strategy     = "spread"
+  spread_level = "rack" # host can be used on Outpost
+  # partition_count = 7 # Only when the strategy is "partition"
 }
