@@ -79,9 +79,11 @@ resource "aws_instance" "ec2_instance_web_server" {
 
   # Automatically allocate a public ip (It has a cost)
   associate_public_ip_address = true
-  subnet_id                   = module.vpc.private_subnets[0]
-  availability_zone           = module.vpc.azs[0]
+  # One instance is bounded to ONE VPC and ONE AZ
+  subnet_id         = module.vpc.private_subnets[0]
+  availability_zone = module.vpc.azs[0]
 
+  # We can attach multiple EBS Volumes, more in ec2 storage section
   root_block_device {
     delete_on_termination = true
     encrypted             = true
@@ -89,6 +91,7 @@ resource "aws_instance" "ec2_instance_web_server" {
     volume_size           = 8
   }
 
+  # This security Group is attached to the main ENI (eth0), not to the instance
   security_groups = [aws_security_group.vpc_sg_allow_ssh.id]
 
   user_data = <<EOT
@@ -106,6 +109,9 @@ EOT
   # Check Placement groups below
   placement_group = aws_placement_group.ec2_placement_group_web_server.id
   # placement_partition_number = "1"
+
+  # The Root EBS Volume must be encrypted and have enough space
+  hibernation = true
 }
 
 
@@ -201,4 +207,28 @@ resource "aws_placement_group" "ec2_placement_group_web_server" {
   strategy     = "spread"
   spread_level = "rack" # host can be used on Outpost
   # partition_count = 7 # Only when the strategy is "partition"
+}
+
+
+# Elastic Network Interface
+
+
+# An EC2 instance can only have one primary ENI
+# This is a secondary one that can be attached or removed at will.
+resource "aws_network_interface" "vpc_network_interface_secondary_web_server" {
+  # It must be on the same VPC
+  subnet_id       = module.vpc.private_subnets[0]
+  private_ips     = ["10.0.1.50", "10.0.1.51"] # This is in the range of the subnet
+  security_groups = [aws_security_group.vpc_sg_allow_ssh.id]
+}
+
+resource "aws_network_interface_attachment" "vpc_network_interface_attach_secondary_web_server" {
+  instance_id          = aws_instance.ec2_instance_web_server.id
+  network_interface_id = aws_network_interface.vpc_network_interface_secondary_web_server.id
+  device_index         = 1
+}
+
+resource "aws_eip_association" "ec2_eip_web_server_network_interface_association" {
+  instance_id          = aws_instance.ec2_instance_web_server.id
+  network_interface_id = aws_network_interface.vpc_network_interface_secondary_web_server.id
 }
