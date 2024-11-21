@@ -92,7 +92,7 @@ resource "aws_instance" "ec2_instance_web_server" {
   }
 
   # This security Group is attached to the main ENI (eth0), not to the instance
-  security_groups = [aws_security_group.vpc_sg_allow_ssh.id]
+  security_groups = [aws_security_group.vpc_sg_allow_ssh.id, aws_security_group.vpc_sg_allow_lb.id]
 
   user_data = <<EOT
 #!/bin/bash
