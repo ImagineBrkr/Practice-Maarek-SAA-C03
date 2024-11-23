@@ -219,3 +219,76 @@ resource "aws_lb_listener" "lb_network_listener" {
     target_group_arn = aws_lb_target_group.lb_network_tg_instances.arn
   }
 }
+
+
+# LAUNCH TEMPLATE
+
+
+resource "aws_launch_template" "ec2_launch_template_web_server" {
+  name = "Web-Server-Template"
+
+  block_device_mappings {
+    device_name = "/dev/sdf"
+
+    ebs {
+      volume_size = 8
+    }
+  }
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.iam_instance_profile_web_server.name
+  }
+
+  ebs_optimized                        = true
+  image_id                             = "ami-0664c8f94c2a2261b"
+  instance_initiated_shutdown_behavior = "stop"
+  instance_type                        = "t2.micro"
+  key_name                             = aws_key_pair.ec2_key_pair_web_server.key_name
+  vpc_security_group_ids               = [aws_security_group.vpc_sg_allow_ssh.id, aws_security_group.vpc_sg_allow_lb.id]
+
+  user_data = <<EOT
+#!/bin/bash
+# This script will run on first start with sudo permissions
+apt update
+apt install -y httpd
+systemctl start httpd
+systemctl enable httpd
+EOT
+}
+
+
+# Auto Scaling Group
+
+
+resource "aws_autoscaling_group" "asg_web_server" {
+  # availability_zones = ["us-east-1a", "us-east-1b", "es-east-1c"] # Uses default subnet
+  vpc_zone_identifier = module.vpc.private_subnets # Uses the AZ from the subnets
+  desired_capacity    = 4
+  max_size            = 2
+  min_size            = 8
+
+  launch_template {
+    id      = aws_launch_template.ec2_launch_template_web_server.id
+    version = aws_launch_template.ec2_launch_template_web_server.latest_version
+  }
+
+  health_check_type         = "ELB" # The load balancer does the health check
+  health_check_grace_period = 300
+}
+
+# We will attach this ASG to a target group
+resource "aws_autoscaling_attachment" "asg_lb_tg_attach_web_server" {
+  autoscaling_group_name = aws_autoscaling_group.asg_web_server.id
+  lb_target_group_arn    = aws_lb_target_group.lb_web_server_tg_instances.arn
+}
+
+# Schedule policy
+resource "aws_autoscaling_schedule" "asg_p_schedule_web_server" {
+  scheduled_action_name  = "web-server-sechedule"
+  min_size               = 5
+  max_size               = 10
+  desired_capacity       = 7
+  start_time             = "2024-12-11T18:00:00Z"
+  end_time               = "2024-12-12T06:00:00Z"
+  autoscaling_group_name = aws_autoscaling_group.asg_web_server.name
+}

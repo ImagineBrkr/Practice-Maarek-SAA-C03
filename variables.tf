@@ -8,3 +8,9 @@ variable "aws_profile" {
   description = "AWS CLI Profile"
   type        = string
 }
+
+variable "db_password" {
+  description = "AWS CLI Profile"
+  type        = string
+  sensitive   = true
+}

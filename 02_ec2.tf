@@ -115,49 +115,6 @@ EOT
 }
 
 
-# LAUNCH TEMPLATE
-
-resource "aws_launch_template" "ec2_launch_template_web_server" {
-  name = "Web-Server-Template"
-
-  block_device_mappings {
-    device_name = "/dev/sdf"
-
-    ebs {
-      volume_size = 8
-    }
-  }
-
-  iam_instance_profile {
-    name = aws_iam_instance_profile.iam_instance_profile_web_server.name
-  }
-
-  ebs_optimized                        = true
-  image_id                             = "ami-0664c8f94c2a2261b"
-  instance_initiated_shutdown_behavior = "stop"
-  instance_type                        = "t2.micro"
-  key_name                             = aws_key_pair.ec2_key_pair_web_server.key_name
-  vpc_security_group_ids               = [aws_security_group.vpc_sg_allow_ssh.id]
-
-  network_interfaces {
-    associate_public_ip_address = true
-  }
-
-  placement {
-    availability_zone = "us-west-2a"
-  }
-
-  user_data = <<EOT
-#!/bin/bash
-# This script will run on first start with sudo permissions
-apt update
-apt install -y httpd
-systemctl start httpd
-systemctl enable httpd
-EOT
-}
-
-
 # LAUNCH TYPES
 
 
