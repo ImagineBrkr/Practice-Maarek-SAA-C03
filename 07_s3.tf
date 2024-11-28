@@ -7,10 +7,11 @@ resource "aws_s3_bucket" "s3_bucket_web_server" {
 
 #We can upload objects to the bucket
 resource "aws_s3_object" "s3_object_image" {
-  bucket = aws_s3_bucket.s3_bucket_web_server.bucket
-  key    = "images/images1.jpg"
-  source = "image1.jpg"
-  acl    = "private"
+  bucket        = aws_s3_bucket.s3_bucket_web_server.bucket
+  key           = "images/images1.jpg"
+  source        = "image1.jpg"
+  acl           = "private"
+  storage_class = "INTELLIGENT_TIERING" #Automatically move between tiers.
 }
 
 
@@ -84,4 +85,71 @@ resource "aws_s3_bucket_versioning" "s3_bucket_web_server_versioning" {
   versioning_configuration {
     status = "Enabled"
   }
+}
+
+
+# Event Notification
+
+
+# We create an SNS topic with a policy that gives permissions to S3 to send events.
+data "aws_iam_policy_document" "sns_s3_events_policy" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+
+    actions   = ["SNS:Publish"]
+    resources = ["arn:aws:sns:*:*:s3-event-notification-topic"]
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = [aws_s3_bucket.s3_bucket_web_server.arn]
+    }
+  }
+}
+resource "aws_sns_topic" "sns_topic_s3_events" {
+  name   = "s3-event-notification-topic"
+  policy = data.aws_iam_policy_document.sns_s3_events_policy.json
+}
+
+resource "aws_s3_bucket_notification" "s3_event_notification_sns" {
+  bucket = aws_s3_bucket.s3_bucket_web_server.id
+
+  topic {
+    topic_arn     = aws_sns_topic.sns_topic_s3_events.arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_suffix = ".log"
+  }
+}
+
+
+# Encryption
+
+
+# We will use Server Side Encryption by default for every object
+resource "aws_s3_bucket_server_side_encryption_configuration" "s3_bucket_web_server_encryption" {
+  bucket = aws_s3_bucket.s3_bucket_web_server.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256" #This will use SSE-S3 encryption
+    }
+  }
+}
+
+#You can encrypt an object with KMS keys
+
+resource "aws_kms_key" "personal_kms_key" {
+  description             = "KMS key Personal"
+  deletion_window_in_days = 7
+}
+
+resource "aws_s3_object" "s3_object_image2" {
+  key        = "index.jpg"
+  bucket     = aws_s3_bucket.s3_bucket_web_server.id
+  source     = "index.jpg"
+  kms_key_id = aws_kms_key.personal_kms_key.arn
 }
