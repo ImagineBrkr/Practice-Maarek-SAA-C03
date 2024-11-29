@@ -153,3 +153,24 @@ resource "aws_s3_object" "s3_object_image2" {
   source     = "index.jpg"
   kms_key_id = aws_kms_key.personal_kms_key.arn
 }
+
+
+# CORS Configuration
+
+
+#CORS Rules for http requests to the S3 Bucket
+resource "aws_s3_bucket_cors_configuration" "s3_bucket_web_server_cors_conf" {
+  bucket = aws_s3_bucket.s3_bucket_web_server.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["GET"]
+    allowed_origins = ["*"]
+    max_age_seconds = 3000
+  }
+
+  cors_rule {
+    allowed_methods = ["POST"]
+    allowed_origins = ["https://my-server.com"]
+  }
+}
