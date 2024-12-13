@@ -10,7 +10,13 @@ variable "aws_profile" {
 }
 
 variable "db_password" {
-  description = "AWS CLI Profile"
+  description = "DB Password"
+  type        = string
+  sensitive   = true
+}
+
+variable "apig_key" {
+  description = "API Gateway Key"
   type        = string
   sensitive   = true
 }
