@@ -126,3 +126,43 @@ resource "aws_security_group" "sg_private_instances" {
     security_groups = [aws_security_group.sg_bastion_host.id]
   }
 }
+
+
+# NAT Gateway
+
+
+# NAT gateway in the public subnet
+resource "aws_nat_gateway" "main_natgw" {
+  subnet_id = aws_subnet.vpc_main_public_subnet.id
+
+  # To ensure proper ordering, it is recommended to add an explicit dependency
+  # on the Internet Gateway for the VPC.
+  depends_on = [aws_internet_gateway.main_igw]
+}
+
+#Traffic from the EC2 instances in the private subnet goes to the NAT Gateway
+resource "aws_route" "main_vpc_private_route_table_natgw_route" {
+  route_table_id         = aws_route_table.main_vpc_private_route_table.id
+  destination_cidr_block = "0.0.0.0/0"                   #Every IP
+  nat_gateway_id         = aws_nat_gateway.main_natgw.id # Goes to the INAT Gateway
+}
+
+
+# VPC Peering
+
+
+resource "aws_vpc_peering_connection" "main_vpc_peering" {
+  peer_vpc_id = aws_vpc.vpc_main.id
+  vpc_id      = module.vpc.vpc_id
+}
+
+
+# VPC Endpoint
+
+
+resource "aws_vpc_endpoint" "s3_endpoint" {
+  vpc_id            = aws_vpc.vpc_main.id
+  service_name      = "com.amazonaws.us-east-1.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.main_vpc_private_route_table.id]
+}
